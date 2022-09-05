@@ -1,0 +1,80 @@
+
+/* Extra large devices (large laptops and desktops, 1200px and up) */
+@media only screen and (min-width: 1200px) {}
+/* Large devices (laptops/desktops, 992px and up) */
+@media only screen and (min-width: 992px) {}
+/* Medium devices (landscape tablets, 768px and up) */
+@media only screen and (min-width: 768px) {
+
+}
+/* Small devices (portrait tablets and large phones, 600px and up) */
+@media only screen and (min-width: 600px) {}
+
+/* Extra small devices (phones, 600px and down) */
+@media only screen and (max-width: 600px) {
+  .sec-heading {
+    margin-bottom: 30px;
+  }
+  .sec-heading h2 {
+    font-size: 32px;
+  }
+  section.min {
+    padding: 30px 0 30px;
+  }
+  .property-listing.list_view .list_view_flex{
+    width: 100%;
+  }
+  .property-listing.list_view .listing-img-wrapper{
+    max-width: 100%;
+  }
+  .nav-brand img {
+    max-width: 50px;
+  }
+  .top-header .cn-info{
+    display: block;
+  }
+  .cn-info ul {
+    display: flex;
+  }
+  .cn-info ul li:nth-child(2) {
+    display: none;
+  }
+  .navigation-portrait .nav-brand {
+    display: flex;
+    justify-content: center;
+  }
+  .page-title{
+    min-height: auto;
+    padding: 2rem 0;
+  }
+  .breadcrumbs-wrap{
+    margin-bottom: 0;
+  }
+  .property-listing.list_view{
+    padding: 0;
+  }
+  .property-listing.list_view .list-img-slide{
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  .property-listing.list_view{
+    margin-bottom: 10px !important;
+  }
+  .footer-first .listing-card-info-price {
+    display: none;
+  }
+  .no-gutters-sm{
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .row.gx-sm-1 > .col,
+  .row.gx-sm-1 > [class*="col-"] {
+    padding-right: 5px;
+    padding-left: 5px;
+  }
+}
+
+
+
+
+

@@ -1,0 +1,200 @@
+.providers_row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  text-align: center;
+  justify-content: center;
+}
+.header-avatar{
+  position: relative;
+  cursor: pointer;
+}
+.box-management {
+  position: absolute;
+  width: 300px;
+  right: -500px;
+  top: 51px;
+  list-style-type: none;
+  background: #fff;
+  transition: all 0.5s ease;
+  padding: 20px;
+}
+
+.header-avatar:hover .box-management {
+  right: 0;
+  border-radius: 5px;
+  box-shadow: rgb(99 99 99 / 20%) 0px 2px 8px 0px;
+}
+.box-management .item {
+  font-size: 12pt;
+}
+.comment-form {
+  background: #fff;
+  padding: 15px 30px;
+}
+.btn{
+  font-weight: 600;
+}
+.header-main-wrapper{
+  padding: 10px 0;
+}
+.header-serach__btn{
+  height: 50px;
+}
+.table>:not(:first-child) {
+  border-top: 2px solid #e4e3e3;
+}
+.jconfirm.jconfirm-light .jconfirm-box .jconfirm-buttons {
+  text-align: center;
+  float: unset;
+}
+.icon-check i {
+  color: #2fcc71;
+  font-size: 60px;
+}
+.dropdown-menu{
+  padding: 0;
+}
+.dashboard-nav__menu-list li:hover > ul.dropdown-menu li a{
+  padding: 5px 10px;
+}
+.dashboard-nav__menu {
+  position: relative;
+  padding-left: 10px;
+}
+.swiper-button-next, .swiper-button-prev {
+  color: #fe9005;
+}
+.js-de-thi .answers {
+  width: 100%;
+  height: 605px;
+}
+b, strong {
+  font-weight: bold;
+}
+.disabled{
+  pointer-events: none;
+}
+.form-de-thi .vertical-tabs{
+  display: none;
+}
+.dethi_form input[type="submit"] {
+  background: #fe9004;
+  border: #fe9004;
+  color: #fff;
+  font-size: 12pt;
+  line-height: 12pt;
+  padding: 10px 14px;
+  border-radius: 4px;
+  margin-right: 10px;
+}
+.dethi_form input[value="Xem trước"] {
+  display: none;
+}
+.dethi_form .field-name-field-tai-lieu-noi-bat{
+  display: none;
+}
+.footer-copyright {
+  background-color: #ededed;
+}
+.doc_tag_item{
+  background: #fff;
+  border-radius: 5px;
+  border: 1px solid #ededed;
+  padding: 20px;
+}
+.tag_list li {
+  padding: 10px 20px 10px;
+  border: 1px solid #eae6e6;
+}
+.doc_tag_title h4{
+  padding-left: 0;
+}
+.dashboard-nav__menu-list.menu_user li a span{
+  font-size: 14px;
+}
+.field-name-field-dap-an-dung{
+  display: none;
+}
+.form-text{
+  margin-top: 0;
+}
+.dethi_form .modal-body{
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+.file-widget.form-managed-file {
+  background: #f8f8f8;
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.node-de_thi-form .answers{
+  width: 100%;
+}
+div.autocomplete-deluxe-multiple{
+  width: 100%!important;
+}
+.chosen-container-multi {
+  width: 100% !important;
+}
+.chosen-container-multi .chosen-choices li.search-field input[type="text"] {
+  height: 36px;
+}
+.modal{
+  z-index: 999;
+}
+.no-scroll {
+  overflow: hidden;
+}
+.title {
+  padding-bottom: 20px;
+}
+.assignment h2 {
+  font-size: 24px;
+}
+span.label-de-thi {
+  font-weight: 700;
+  margin-right: 5px;
+  font-size: 12pt;
+}
+.js-de-thi {
+  border-radius: 5px;
+  padding: 0 20px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #ece8e8;
+  padding-top: 5px;
+}
+.countdown i {
+  color: #1a1919;
+  font-size: 14pt;
+  margin-right: 5px;
+}
+.js-de-thi .answers {
+  border: none;
+  border-top: 1px solid #ece8e8;
+  padding: 20px 0;
+}
+.tutor-course-price-preview__btn{
+  flex: 1;
+  padding-top: 0;
+  padding-bottom: 15px;
+}
+.infomation_examp .property-pratice {
+  display: inline-block;
+  flex: 0 0 20%;
+}
+.infomation_examp {
+  margin-bottom: 3px;
+  text-align: left;
+  display: flex;
+}
+.infomation_examp .property-pratice {
+  display: inline-block;
+  flex: 0 0 20%;
+  font-weight: 500;
+}

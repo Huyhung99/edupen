@@ -1,0 +1,34 @@
+<?php
+
+/**
+ * Implements hook_action_info().
+ */
+function a_quan_ly_de_thi_menu()
+{
+  $items['form-sua-bai'] = array(
+    'title' => 'delete product',
+    'delivery callback' => 'form_sua_bai',
+    'access callback' => 'TRUE',
+    'access arguments' => array('form_sua_bai'),
+    'type' => MENU_CALLBACK
+  );
+  return $items;
+}
+function form_sua_bai()
+{
+  if($_POST['sua_bai'])
+  {
+    module_load_include('inc', 'node', 'node.pages');
+    $node = node_load($_POST['sua_bai']);
+    $form = drupal_get_form('page_node_form', $node);
+    $form_new= render($form);
+    dpm($_POST['sua_bai']);
+    dpm($form_new);
+    echo drupal_json_encode(
+      array(
+        'form_sua'=>$form_new,
+      )
+    );
+  }
+  return TRUE;
+}

@@ -1,0 +1,1292 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function hpmap_menu()
+{
+  $items['dong-bo-san-pham'] = array(
+    'title' => 'Đồng bộ sản phẩm',
+    'delivery callback' => 'dong_bo_san_pham',
+    'access callback' => 'TRUE',
+    'type' => MENU_CALLBACK
+  );
+  $items['tim-san-pham'] = array(
+    'title' => 'Tìm kiếm sản phẩm',
+    'delivery callback' => 'tim_kiem_san_pham',
+    'access callback' => 'TRUE',
+    'access arguments' => array('tim_kiem_san_pham'),
+    'type' => MENU_CALLBACK
+  );
+  $items['get-thong-tin-chi-tiet-san-pham'] = array(
+    'title' => 'Lấy thông tin chi tiết sản phẩm',
+    'delivery callback' => 'get_thong_tin_chi_tiet_san_pham',
+    'access callback' => 'TRUE',
+    'access arguments' => array('get_thong_tin_chi_tiet_san_pham'),
+    'type' => MENU_CALLBACK
+  );
+  $items['update-status-user'] = array(
+    'title' => 'Set status user 0',
+    'delivery callback' => 'update_status_user',
+    'access callback' => 'TRUE',
+    'access arguments' => array('update_status_user'),
+    'type' => MENU_CALLBACK
+  );
+  $items['update-status-product'] = array(
+    'title' => 'Set status user 0',
+    'delivery callback' => 'update_status_product',
+    'access callback' => 'TRUE',
+    'access arguments' => array('update_status_product'),
+    'type' => MENU_CALLBACK
+  );
+  $items['delete-product'] = array(
+    'title' => 'delete product',
+    'delivery callback' => 'delete_product',
+    'access callback' => 'TRUE',
+    'access arguments' => array('delete_product'),
+    'type' => MENU_CALLBACK
+  );
+  $items['ban-do'] = array(
+    'title' => 'Bản đồ HPMap',
+    'page callback' => 'render_ban_do',
+    'type' => MENU_CALLBACK,
+    'access callback' => TRUE
+  );
+  $items['update-email-identify-user'] = array(
+    'title' => 'Update xác thực email',
+    'page callback' => 'update_xac_thuc_email_user',
+    'type' => MENU_CALLBACK,
+    'access callback' => TRUE
+  );
+  $items['check-email-identity'] = array(
+    'title' => 'Xác thực email',
+    'page callback' => 'check_email_identity',
+    'type' => MENU_CALLBACK,
+    'access callback' => TRUE
+  );
+  $items['uncheck-email-identity'] = array(
+    'title' => 'Xác thực email',
+    'page callback' => 'uncheck_email_identity',
+    'type' => MENU_CALLBACK,
+    'access callback' => TRUE
+  );
+  $items['update-user-password'] = array(
+    'title' => 'Cập nhật mật khẩu người dùng',
+    'page callback' => 'update_user_password',
+    'type' => MENU_CALLBACK,
+    'access callback' => TRUE
+  );
+  $items['update-user-email'] = array(
+    'title' => 'Cập nhật email người dùng',
+    'page callback' => 'update_user_email',
+    'type' => MENU_CALLBACK,
+    'access callback' => TRUE
+  );
+  $items['check-email-identity-login'] = array(
+    'title' => 'Xác thực mail khi đăng nhập',
+    'page callback' => 'check_email_identity_login',
+    'type' => MENU_CALLBACK,
+    'access callback' => TRUE
+  );
+  $items['convert-url'] = array(
+    'title' => 'Convert Url',
+    'page callback' => 'convert_url',
+    'type' => MENU_CALLBACK,
+    'access callback' => TRUE
+  );
+  return $items;
+}
+
+function render_ban_do()
+{
+  return <<<HTML
+<div id="my-map"></div>
+HTML;
+}
+
+/**
+ * Implements hook_user_login().
+ */
+function hpmap_user_login(&$edit, $account)
+{
+  global $user;
+  setcookie("user_loggedHPMap", json_encode([
+    'uid' => $user->uid,
+    'name' => $user->name,
+    'access' => $user->access
+  ]), 0, "/", ".hpmap.vn");
+}
+
+/**
+ * Implements hook_user_logout().
+ */
+function hpmap_user_logout($account)
+{
+  if (isset($_COOKIE['user_loggedHPMap'])) {
+    unset($_COOKIE['user_loggedHPMap']);
+    setcookie('user_loggedHPMap', null, -1, '/');
+    return true;
+  } else {
+    return false;
+  }
+}
+
+function hpmap_user_register_submit($form, &$form_state)
+{
+  $curl = curl_init();
+  curl_setopt_array($curl, [
+    CURLOPT_URL => 'https://app.hpmap.vn/service/generation-auth',
+    CURLOPT_RETURNTRANSFER => TRUE,
+    CURLOPT_ENCODING => '',
+    CURLOPT_MAXREDIRS => 10,
+    CURLOPT_TIMEOUT => 0,
+    CURLOPT_FOLLOWLOCATION => TRUE,
+    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+    CURLOPT_CUSTOMREQUEST => 'POST',
+    CURLOPT_POSTFIELDS => json_encode([
+      "username" => $form['account']['name']['#value'],
+    ]),
+    CURLOPT_HTTPHEADER => [
+      'Content-Type: application/json',
+      //      'Cookie: _csrf-backend=1d1f189315c04255c97019c8d04a18e4815e9ebf7d68c24e3bf690d637ab0396a%3A2%3A%7Bi%3A0%3Bs%3A13%3A%22_csrf-backend%22%3Bi%3A1%3Bs%3A32%3A%22z6qHzQbiby8jcKCzN5VICKAsiwfySN4u%22%3B%7D',
+    ],
+  ]);
+  $response = curl_exec($curl);
+  $err = curl_error($curl);
+  curl_close($curl);
+  if ($err) {
+    return $err;
+  } else {
+    return $response;
+  }
+}
+
+function hpmap_user_register_form_validate($form, &$form_state)
+{
+  if (isset($form_state['values']['pass']) && drupal_strlen($form_state['values']['pass']) > 0) {
+    $form_state['values']['pass_plain'] = $form_state['values']['pass'];
+  }
+}
+
+/**
+ * Implements hook_user_presave().
+ */
+function hpmap_user_presave(&$edit, $account, $category)
+{
+  dpm($edit);
+  global $user;
+  $users = entity_load('user');
+  $myLastElement = end($users);
+  $uid = $myLastElement->uid + 1;
+  if ($account->uid == 0) {
+    $uid_1 = $uid;
+    $filename = '';
+  } else {
+    $uid_1 = $account->uid;
+    if (!empty($account->field_image)) {
+      $filename = file_create_url($account->field_image['und'][0]['uri']);
+    } else {
+      $filename = 'https://hpmap.vn/sites/default/files/pictures/no-avarta.jpg';
+    }
+  }
+  $token = md5(md5(date('YmdH') . $user->uid . 'MHS'));
+  $curl = curl_init();
+  curl_setopt_array($curl, [
+    CURLOPT_URL => 'https://app.hpmap.vn/service/save-user',
+    CURLOPT_RETURNTRANSFER => TRUE,
+    CURLOPT_ENCODING => '',
+    CURLOPT_MAXREDIRS => 10,
+    CURLOPT_TIMEOUT => 0,
+    CURLOPT_FOLLOWLOCATION => TRUE,
+    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+    CURLOPT_CUSTOMREQUEST => 'POST',
+    CURLOPT_POSTFIELDS => json_encode([
+      "name" => $account->name,
+      "field_ho_ten" => $account->field_ho_ten['und'][0]['value'],
+      "field_so_dien_thoai_vn" => $account->field_so_dien_thoai_vn['und'][0]['value'],
+      "field_dia_chi_du_an" => isset($account->field_dia_chi_du_an['und'][0]['value']) ? $account->field_dia_chi_du_an['und'][0]['value'] : '',
+      "field_dt_nguoi_gioi_thieu" => isset($account->field_dt_nguoi_gioi_thieu['und'][0]['value']) ? $account->field_dt_nguoi_gioi_thieu['und'][0]['value'] : '',
+      "pass" => $account->pass,
+      "pass_plain" => (isset($edit['pass_plain']) ? $edit['pass_plain'] : ''),
+      "uid" => $uid_1,
+      "uid_nguoi_tao" => $account->uid,
+      "chuc_vu" => isset($edit['field_chuc_vu_user']['und'][0]['value']) ? $edit['field_chuc_vu_user']['und'][0]['value'] : '',
+      "avatar" => $filename,
+      "token" => $token
+    ]),
+    CURLOPT_HTTPHEADER => [
+      'Content-Type: application/json',
+      'Cookie: _csrf-backend=1d1f189315c04255c97019c8d04a18e4815e9ebf7d68c24e3bf690d637ab0396a%3A2%3A%7Bi%3A0%3Bs%3A13%3A%22_csrf-backend%22%3Bi%3A1%3Bs%3A32%3A%22z6qHzQbiby8jcKCzN5VICKAsiwfySN4u%22%3B%7D'
+    ],
+  ]);
+  $response = curl_exec($curl);
+  $err = curl_error($curl);
+  curl_close($curl);
+  if ($err) {
+    return $err;
+  } else {
+    dpm($response);
+    return json_decode($response);
+  }
+}
+
+function saveSanPham($nodes)
+{
+
+  global $user;
+  $curl = curl_init();
+  curl_setopt_array($curl, array(
+    CURLOPT_URL => 'https://app.hpmap.vn/service/save-arr-san-pham',
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_ENCODING => '',
+    CURLOPT_MAXREDIRS => 10,
+    CURLOPT_TIMEOUT => 0,
+    CURLOPT_FOLLOWLOCATION => true,
+    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+    CURLOPT_CUSTOMREQUEST => 'POST',
+    CURLOPT_POSTFIELDS => json_encode([
+      'uid' => $user->uid,
+      'token' => md5(md5(date('YmdHi') . 'MHS')),
+      'nodes' => $nodes
+    ]),
+    // md5(md5($dateTime.$obj['ui'].$obj['title'].$obj['nid'].$obj['form_token'].'MHS'));
+    CURLOPT_HTTPHEADER => array(
+      'Content-Type: application/json'
+    ),
+  ));
+  $response = curl_exec($curl);
+  dpm($response);
+  return $response;
+}
+
+function dong_bo_san_pham()
+{
+  $arrNid = [];
+
+  $strSQL = 'SELECT t.nid FROM wtt_node t
+            WHERE t.nid not IN (SELECT t100.entity_id FROM wtt_field_data_field_da_dong_bo t100 )
+              and t.type = :t';
+  $data = db_query($strSQL, array(':t' => 'san_pham'))->fetchAll();
+  foreach ($data as $item)
+    $arrNid[$item->nid] = $item->nid;
+
+  $strSQL = 'SELECT entity_id FROM wtt_field_data_field_da_dong_bo t100 where field_da_dong_bo_value = 0';
+  $data = db_query($strSQL)->fetchAll();
+  foreach ($data as $item)
+    $arrNid[$item->entity_id] = $item->entity_id;
+
+  $nodes = node_load_multiple($arrNid);
+  $results = saveSanPham($nodes);
+  $nodes = node_load_multiple(json_decode($results)->nodeDaLuu);
+
+  //  if(count($results['nodeDaLuu']))
+  foreach ($nodes as $node) {
+    $num_updated = db_update('field_data_field_da_dong_bo')
+      ->fields([
+        'field_da_dong_bo_value' => 1,
+      ])
+      ->condition('entity_id', $node->nid, '=')
+      ->execute();
+  }
+  echo 'Đã đồng bộ thành công ' . count($nodes) . ' sản phẩm';
+}
+
+/**
+ * Implements hook_node_update().
+ */
+function hpmap_node_update($node)
+{
+  $num_updated = db_update('field_data_field_da_dong_bo')
+    ->fields([
+      'field_da_dong_bo_value' => 0,
+    ])
+    ->condition('entity_id', $node->nid, '=')
+    ->execute();
+}
+
+/*---------------------- OLD ----------------------/**/
+function getKhuVuc($type)
+{
+  $curl = curl_init();
+  global $user;
+  //"{\n\t\"uid\": 170,\n\t\"type\": \"Thành phố\",\n\t\"token\": \"02934029432409240zvzxcv\"\n}"
+  curl_setopt_array($curl, array(
+    CURLOPT_URL => "https://app.hpmap.vn/service/get-khu-vuc",
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_ENCODING => "",
+    CURLOPT_MAXREDIRS => 10,
+    CURLOPT_TIMEOUT => 30,
+    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+    CURLOPT_CUSTOMREQUEST => "POST",
+    CURLOPT_POSTFIELDS => json_encode([
+      'uid' => $user->uid,
+      'type' => $type,
+      'token' => md5(md5(date('YmdHi') . $user->uid . 'MHS'))
+    ]),
+    CURLOPT_HTTPHEADER => array(
+      "cache-control: no-cache",
+      "content-type: application/json",
+      "postman-token: 6069a2d7-1994-fa28-aa79-d44b6da55adf"
+    ),
+  ));
+
+  $response = curl_exec($curl);
+  $err = curl_error($curl);
+
+  curl_close($curl);
+
+  if ($err) {
+    return $err;
+  } else {
+    return $response;
+  }
+}
+
+function getThongTinSanPham($idSanPham)
+{
+  $curl = curl_init();
+  global $user;
+  $token = md5(md5(date('YmdH') . $user->uid . 'MHS'));
+  //"{\n\t\"uid\": 170,\n\t\"type\": \"Thành phố\",\n\t\"token\": \"02934029432409240zvzxcv\"\n}"
+  curl_setopt_array($curl, array(
+    CURLOPT_URL => "https://app.hpmap.vn/service/get-thong-tin-san-pham",
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_ENCODING => "",
+    CURLOPT_MAXREDIRS => 10,
+    CURLOPT_TIMEOUT => 30,
+    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+    CURLOPT_CUSTOMREQUEST => "POST",
+    CURLOPT_POSTFIELDS => json_encode([
+      'uid' => $user->uid,
+      'token' => $token,
+      'san_pham' => $idSanPham,
+    ]),
+    CURLOPT_HTTPHEADER => array(
+      "cache-control: no-cache",
+      "content-type: application/json",
+      "postman-token: 6069a2d7-1994-fa28-aa79-d44b6da55adf"
+    ),
+  ));
+
+  $response = curl_exec($curl);
+  $err = curl_error($curl);
+
+  curl_close($curl);
+
+  if ($err) {
+    return $err;
+  } else {
+    return json_decode($response, true);
+  }
+}
+
+function getThongTinSanPhamNid($idSanPham)
+{
+  $curl = curl_init();
+  global $user;
+  $token = md5(md5(date('YmdH') . $user->uid . 'MHS'));
+  //"{\n\t\"uid\": 170,\n\t\"type\": \"Thành phố\",\n\t\"token\": \"02934029432409240zvzxcv\"\n}"
+  curl_setopt_array($curl, array(
+    CURLOPT_URL => "https://app.hpmap.vn/service/get-thong-tin-san-pham-id",
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_ENCODING => "",
+    CURLOPT_MAXREDIRS => 10,
+    CURLOPT_TIMEOUT => 30,
+    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+    CURLOPT_CUSTOMREQUEST => "POST",
+    CURLOPT_POSTFIELDS => json_encode([
+      'uid' => $user->uid,
+      'token' => $token,
+      'san_pham' => $idSanPham,
+    ]),
+    CURLOPT_HTTPHEADER => array(
+      "cache-control: no-cache",
+      "content-type: application/json",
+      "postman-token: 6069a2d7-1994-fa28-aa79-d44b6da55adf"
+    ),
+  ));
+
+  $response = curl_exec($curl);
+  $err = curl_error($curl);
+
+  curl_close($curl);
+
+  if ($err) {
+    return $err;
+  } else {
+    return json_decode($response, true);
+  }
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function hpmap_form_alter(&$form, &$form_state, $form_id)
+{
+
+  global $user;
+  $hidden = '';
+  if ($user->uid != 575) {
+    $hidden = 'class="d-none"';
+  }
+  $token = md5(md5(date('YmdH') . $user->uid . 'MHS'));
+  if ($form_id == 'san_pham_node_form') {
+    //    dpm($form);
+    $form['actions']['submit']['#value'] = 'Đăng tin';
+    $form['#prefix'] = '<div class="row"><div class="col-md-12">';
+    $form['#suffix'] = '</div></div>';
+    $form['title']['#prefix'] = '<h3 class="title-dien-thong-tin text-center mt-20 font-weight-bold">ĐĂNG TIN SẢN PHẨM</h3>
+    <div class="row"><div class="col-md-6"><div class="col-left"><div class="sub-col-left"><div class="title_thong_tin"><h4>Thông tin liên hệ</h4> <hr> </div>
+    <div class="row"><div class="col-md-12">';
+    $form['title']['#suffix'] = '</div></div>';
+    $form['title']['#attributes']['class'] = array('form-control');
+    $form['title']['#title'] = t('Tên sản phẩm (VD : Bán nhà 389 Tam Kỳ)');
+
+    $form['field_ho_ten_chu_nha']['#prefix'] = t('<div class="row"><div class="col-md-6 col-6">');
+    $form['field_ho_ten_chu_nha']['#suffix'] = t('</div>');
+
+    $form['field_dien_thoai_chu_nha']['#prefix'] = t('<div class="col-md-6 col-6">');
+    $form['field_dien_thoai_chu_nha']['#suffix'] = t('</div></div>');
+
+    $form['field_dien_thoai_chu_nha']['und'][0]['value']['#attributes']['class'] = array('form-control ');
+    $form['field_ho_ten_chu_nha']['und'][0]['value']['#attributes']['class'] = array('form-control ');
+
+    $form['field_thanh_pho']['#attributes']['class'] = array('d-none');
+
+    $form['field_quan_huyen']['#prefix'] = t('<div class="title_thong_tin mt-20"><h4>Địa chỉ</h4> <hr> </div><div class="row"><div class="col-md-4">');
+    $form['field_quan_huyen']['#suffix'] = t('</div>');
+    $form['field_phuong_xa']['#prefix'] = t('<div class="col-md-4">');
+    $form['field_phuong_xa']['#suffix'] = t('</div>');
+    $form['field_danh_sach_cac_dinh']['#suffix'] = t('</div></div></div>');
+
+    $form['field_duong_pho']['#prefix'] = t('<div class="col-md-4">');
+    $form['field_duong_pho']['#suffix'] = t('</div></div>');
+
+    $form['field_chieu_dai_mb']['#prefix'] = t('<div class="col-md-6"><div class="col-right" id="col-right"><div class="title_thong_tin "><h4>Thông số</h4> <hr> </div><div class="row"><div class="col-md-6">');
+    $form['field_chieu_dai_mb']['#suffix'] = t('</div>');
+    $form['field_chieu_rong']['#prefix'] = t('<div class="col-md-6 ">');
+    $form['field_chieu_rong']['#suffix'] = t('</div></div>');
+    $form['field_dien_tich_su_dung']['#prefix'] = t('<div class="row"><div class="col-md-6 ">');
+    $form['field_dien_tich_su_dung']['#suffix'] = t('</div>');
+    $form['field_dien_tich_mat_bang']['#prefix'] = t('<div class="col-md-6 ">');
+    $form['field_dien_tich_mat_bang']['#suffix'] = t('</div></div>');
+
+    $form['field_lien_he']['#prefix'] = t('<div class="row mt-30 post-date-1 d-none"><div class="d-none">');
+    $form['field_lien_he']['#suffix'] = t('</div>');
+    $form['field_phap_ly']['#prefix'] = t('<div class="col-md-6">');
+    $form['field_phap_ly']['#suffix'] = t('</div></div>');
+    $form['field_ngay_dang']['#prefix'] = t('<div class="col-md-6">');
+    $form['field_ngay_dang']['#suffix'] = t('</div></div>');
+    $form['field_banner']['#attributes']['class'] = array('mt-30 d-none');
+    $form['field_hien_thi_o_trang_chu']['#attributes']['class'] = array('d-none');
+    $form['field_tien_nghi_khac']['#prefix'] = '<div class="d-none">';
+    $form['field_tien_nghi_khac']['#suffix'] = '</div>';
+    $form['field_dien_tich_mat_bang']['und'][0]['value']['#attributes']['class'] = array('form-control');
+    $form['field_dien_tich_su_dung']['und'][0]['value']['#attributes']['class'] = array('form-control');
+    $form['field_chieu_dai_mb']['und'][0]['value']['#attributes']['class'] = array('form-control');
+    $form['field_chieu_rong']['und'][0]['value']['#attributes']['class'] = array('form-control ');
+    $form['field_lien_he']['und'][0]['value']['#attributes']['class'] = array('form-control ');
+    $form['field_phap_ly']['und'][0]['value']['#attributes']['class'] = array('form-control ');
+    $form['field_toa_do_vi_tri']['und'][0]['value']['#attributes']['class'] = array('form-control');
+    $form['field_danh_sach_cac_dinh']['und'][0]['value']['#attributes']['class'] = array('form-control');
+    $form['actions']['submit']['#attributes']['class'] = array('btn btn-primary btn-lg mt-20');
+    $form['actions']['preview']['#attributes']['class'] = array('d-none');
+
+    $form['field_chieu_dai_mb']['und'][0]['value']['#title'] = t('Chiều dài') . ' (' . html_entity_decode('m') . ')';
+    $form['field_chieu_rong']['und'][0]['value']['#title'] = t('Chiều rộng') . ' (' . html_entity_decode('m') . ')';
+    $form['field_dien_tich_su_dung']['und'][0]['value']['#title'] = t('Diện tích sử dụng') . ' (' . html_entity_decode('m<sup>2</sup>') . ')';
+    $form['field_dien_tich_mat_bang']['und'][0]['value']['#title'] = t('Diện tích mặt bằng') . ' (' . html_entity_decode('m<sup>2</sup>') . ')';
+    $form['field_gia']['#prefix'] = t('<div class="title_thong_tin mt-20"><h4>Giá</h4> <hr> </div><div class="row"><div class="col-md-4">');
+    $form['field_gia']['#suffix'] = t('</div>');
+    $form['field_khoang_gia_den']['#prefix'] = t('<div class="col-md-6 col-6">');
+    $form['field_khoang_gia_den']['#suffix'] = t('</div>');
+    $form['field_gia_bang_chu']['#prefix'] = t('<div class="col-md-12 col-12">');
+    $form['field_gia_bang_chu']['#suffix'] = t('</div>');
+
+
+    $form['field_so_giuong']['#prefix'] = t('<div class="title_thong_tin mt-20"><h4>Thông tin khác</h4> <hr> </div><div class="row"><div class="col-md-6 col-6">');
+    $form['field_so_giuong']['#suffix'] = t('</div>');
+    $form['field_so_phong_tam']['#prefix'] = t('<div class="col-md-6 col-6">');
+    $form['field_so_phong_tam']['#suffix'] = t('</div></div>');
+
+    $form['field_phan_loai']['#prefix'] = t('<div class="title_thong_tin mt-20"><h4>Phân loại và địa chỉ</h4> <hr> </div><div class="row"><div class="col-md-6">');
+    $form['field_phan_loai']['#suffix'] = t('</div>');
+
+
+    $form['field_gia']['und'][0]['value']['#attributes']['class'] = array('form-control ');
+    //    $form['field_dia_chi_du_an']['#suffix'] = '</div>';
+    $form['field_dia_chi_du_an']['und'][0]['value']['#attributes']['class'] = array('form-control');
+    $form['field_khoang_gia_den']['und'][0]['value']['#attributes']['class'] = array('form-control d-none');
+    $form['field_gia_bang_chu']['und'][0]['value']['#attributes']['class'] = array('form-control d-none');
+
+    $form['field_so_giuong']['und'][0]['value']['#attributes']['class'] = array('form-control ');
+    $form['field_so_phong_tam']['und'][0]['value']['#attributes']['class'] = array('form-control ');
+    $form['field_khoang_gia']['und'][0]['value']['#attributes']['class'] = array('form-control ');
+    $form['field_phuong_xa']['und'][0]['value']['#attributes']['class'] = array('form-control ');
+
+
+    $form['field_tags']['und']['#attributes']['class'] = array('form-control');
+    //    $form['field_tags']['#prefix'] = '<div class="col-md-6">';
+
+    //    $form['field_tags']['#suffix'] = '</div></div>';
+
+    $form['field_tang']['und'][0]['value']['#attributes']['class'] = array('form-control');
+    $form['field_so_tang']['und'][0]['value']['#attributes']['class'] = array('form-control');
+    $form['field_don_vi_tinh']['und'][0]['value']['#attributes']['class'] = array('form-control');
+
+    $form['field_tang']['#prefix'] = '<div class="row"><div class="col-md-6">';
+    $form['field_tang']['#suffix'] = '</div>';
+    $form['field_so_tang']['#prefix'] = '<div class="col-md-6">';
+    $form['field_so_tang']['#suffix'] = '</div></div>';
+
+    $form['field_don_vi_tinh']['#prefix'] = t('<div class="col-md-4">');
+    $form['field_don_vi_tinh']['#suffix'] = t('</div>');
+    $form['field_khoang_gia']['#prefix'] = t('<div class="col-md-4">');
+    $form['field_khoang_gia']['#suffix'] = t('</div></div>');
+
+    $form['field_tang']['#prefix'] = t('<div class="row"><div class="col-6 col-md-6">');
+    $form['field_tang']['#suffix'] = t('</div>');
+    $form['field_so_tang']['#prefix'] = t('<div class="col-6 col-md-6">');
+    $form['field_so_tang']['#suffix'] = t('</div></div>');
+
+    $form['field_don_vi_tinh']['und']['#attributes']['class'] = array('form-control');
+    $form['field_san_pham_vip']['#prefix'] = t('<div id="san_pham_vip" >');
+    $form['field_san_pham_vip']['#suffix'] = t('</div>');
+
+    $form['actions']['#suffix'] = t('</div></div>');
+
+    $form['field_toa_do_vi_tri']['#suffix'] = t('<div id="map_id"></div><div class="action-map"><a class="my-position" href="#"><i class="fa fa-map-marker" aria-hidden="true"></i></a><a class="btn-zoomin" href="#"><i class="fa fa-plus" aria-hidden="true"></i></a><a class="btn-zoomout" href="#"><i class="fa fa-minus" aria-hidden="true"></i></a></div>');
+  } else if ($form_id == 'user_register_form') {
+    //        $form['#submit'][] = 'hpmap_user_register_submit';
+  } else if ($form_id == 'user_profile_form') {
+    // $form['#submit'][] = 'hpmap_user_update_submit';
+  } else if ($form_id == 'user-login') {
+    //    $form['#submit'][] = 'hpmap_user_login_social';
+  }
+
+  // Save plain password (happens in validation function).
+  if ($form_id == 'user_profile_form' || $form_id == 'user_register_form') {
+    $form['#validate'][] = 'hpmap_user_register_form_validate';
+  }
+}
+
+function tamplate_sibarright()
+{
+  return '<h3 class="title-dien-thong-tin d-none d-sm-block text-center mt-20">Hướng dẫn</h3><img class="d-none d-sm-block" src="/sites/default/files/screencapture-hpmap-vn-node-add-san-pham-2021-12-27-17_28_48.png" alt="Hướng dẫn">';
+}
+
+function hpmap_user_login_social($form, &$form_state)
+{
+  global $user;
+  $curl = curl_init();
+  curl_setopt_array($curl, [
+    CURLOPT_URL => 'https://app.hpmap.vn/service/generation-auth',
+    CURLOPT_RETURNTRANSFER => TRUE,
+    CURLOPT_ENCODING => '',
+    CURLOPT_MAXREDIRS => 10,
+    CURLOPT_TIMEOUT => 0,
+    CURLOPT_FOLLOWLOCATION => TRUE,
+    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+    CURLOPT_CUSTOMREQUEST => 'POST',
+    CURLOPT_POSTFIELDS => json_encode([
+      "username" => $form['account']['name']['#value'],
+    ]),
+    CURLOPT_HTTPHEADER => [
+      'Content-Type: application/json',
+      //      'Cookie: _csrf-backend=1d1f189315c04255c97019c8d04a18e4815e9ebf7d68c24e3bf690d637ab0396a%3A2%3A%7Bi%3A0%3Bs%3A13%3A%22_csrf-backend%22%3Bi%3A1%3Bs%3A32%3A%22z6qHzQbiby8jcKCzN5VICKAsiwfySN4u%22%3B%7D',
+    ],
+  ]);
+  $response = curl_exec($curl);
+  $err = curl_error($curl);
+  curl_close($curl);
+  if ($err) {
+    return $err;
+  } else {
+    $data = json_decode($response, true);
+    $edit['redirect'] = 'https://app.hpmap.vn/site/login?auth_key=' . $data['auth_key'] . '&user_name=' . $form['account']['name']['#value'];
+    return $response;
+  }
+}
+
+function hpmap_login_soft(&$form, &$form_state)
+{
+  global $user;
+  $curl = curl_init();
+  curl_setopt_array($curl, [
+    CURLOPT_URL => 'https://app.hpmap.vn/service/generation-auth',
+    CURLOPT_RETURNTRANSFER => TRUE,
+    CURLOPT_ENCODING => '',
+    CURLOPT_MAXREDIRS => 10,
+    CURLOPT_TIMEOUT => 0,
+    CURLOPT_FOLLOWLOCATION => TRUE,
+    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+    CURLOPT_CUSTOMREQUEST => 'POST',
+    CURLOPT_POSTFIELDS => json_encode([
+      "username" => $user->name,
+    ]),
+    CURLOPT_HTTPHEADER => [
+      'Content-Type: application/json',
+      'Cookie: _csrf-backend=1d1f189315c04255c97019c8d04a18e4815e9ebf7d68c24e3bf690d637ab0396a%3A2%3A%7Bi%3A0%3Bs%3A13%3A%22_csrf-backend%22%3Bi%3A1%3Bs%3A32%3A%22z6qHzQbiby8jcKCzN5VICKAsiwfySN4u%22%3B%7D',
+    ],
+  ]);
+  $response = curl_exec($curl);
+  $err = curl_error($curl);
+  curl_close($curl);
+  if ($err) {
+    return $err;
+  } else {
+    $data = json_decode($response, true);
+    drupal_goto('http://app.hpmap.vn/site/login?auth_key=' . $data['auth_key'] . '&user_name=' . $user->name);
+    return $response;
+  }
+}
+
+function hpmap_user_update_submit(&$form, &$form_state)
+{
+  global $user;
+  $token = md5(md5(date('YmdH') . $user->uid . 'MHS'));
+  $value = $form_state['values'];
+  $curl = curl_init();
+  curl_setopt_array($curl, [
+    CURLOPT_URL => 'https://app.hpmap.vn/service/update-user',
+    CURLOPT_RETURNTRANSFER => TRUE,
+    CURLOPT_ENCODING => '',
+    CURLOPT_MAXREDIRS => 10,
+    CURLOPT_TIMEOUT => 0,
+    CURLOPT_FOLLOWLOCATION => TRUE,
+    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+    CURLOPT_CUSTOMREQUEST => 'POST',
+    CURLOPT_POSTFIELDS => json_encode([
+      "name" => $value['name'],
+      "field_ho_ten" => $value['field_ho_ten']['und'][0]['value'],
+      "field_so_dien_thoai_vn" => $value['field_so_dien_thoai_vn']['und'][0]['value'],
+      "field_dia_chi_du_an" => $value['field_dia_chi_du_an']['und'][0]['value'],
+      "pass" => $value['pass'],
+      "uid" => $user->uid,
+      "id" => $value['uid'],
+      "token" => $token
+    ]),
+    CURLOPT_HTTPHEADER => [
+      'Content-Type: application/json',
+      'Cookie: _csrf-backend=1d1f189315c04255c97019c8d04a18e4815e9ebf7d68c24e3bf690d637ab0396a%3A2%3A%7Bi%3A0%3Bs%3A13%3A%22_csrf-backend%22%3Bi%3A1%3Bs%3A32%3A%22z6qHzQbiby8jcKCzN5VICKAsiwfySN4u%22%3B%7D'
+    ],
+  ]);
+  $response = curl_exec($curl);
+  curl_close($curl);
+}
+
+function lists_session($key, $value = NULL)
+{
+  global $user;
+  static $storage;
+  // If the user is anonymous, force a session start.
+  if (!$user->uid) {
+    drupal_session_start();
+  }
+  if ($value) {
+    $storage[$key] = $value;
+    $_SESSION['lists'][$key] = $value;   // I put 'lists' in case some other module uses 'type' in $_SESSION
+  } else if (empty($storage[$key]) && isset($_SESSION['lists'][$key])) {
+    $storage[$key] = $_SESSION['lists'][$key];
+  }
+  return $storage[$key];
+}
+
+function tim_kiem_san_pham()
+{
+  global $user;
+  $token = md5(md5(date('YmdH') . $user->uid . 'MHS'));
+  header('Access-Control-Allow-Origin: *');
+  header('Content-type: application/json');
+  $obj = $_POST;
+  if (count($obj) == 0) {
+    $dataPost = file_get_contents('php://input');
+    $obj = json_decode($dataPost); // json::decode($dataPost);
+  }
+  $curl = curl_init();
+  curl_setopt_array($curl, [
+    CURLOPT_URL => 'https://app.hpmap.vn/service/tim-kiem-san-pham',
+    CURLOPT_RETURNTRANSFER => TRUE,
+    CURLOPT_ENCODING => '',
+    CURLOPT_MAXREDIRS => 10,
+    CURLOPT_TIMEOUT => 0,
+    CURLOPT_FOLLOWLOCATION => TRUE,
+    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+    CURLOPT_CUSTOMREQUEST => 'POST',
+    CURLOPT_POSTFIELDS => json_encode([
+      "quan_huyen" => $obj['quan_huyen'],
+      "duong_pho" => $obj['duong_pho'],
+      "khoang_gia" => [$obj['khoang_gia']],
+      "huong" => $obj['huong'],
+      "khoang_dien_tich" => [$obj['khoang_dien_tich']],
+      "phan_loai" => [$obj['phan_loai']],
+      "name" => $obj['name'],
+    ]),
+    CURLOPT_HTTPHEADER => [
+      'Content-Type: application/json'
+    ],
+  ]);
+  $response = curl_exec($curl);
+  curl_close($curl);
+  lists_session('san_pham', $response);
+  return drupal_json_output($response);
+}
+
+function get_thong_tin_chi_tiet_san_pham()
+{
+  //get api san pham ben soft
+  $softSanPham = getThongTinSanPham($_POST['san_pham']);
+  $dvt_new = [];
+  $dvt = getKhuVuc('Đơn vị tính');
+  foreach (json_decode($dvt) as $item) {
+    $dvt_new[$item->id] = $item->name;
+  }
+
+  if (isset($_POST['avatar'])) {
+    $avatar = $_POST['avatar'];
+  }
+  $arrImages_desktop = '';
+  $sanPham = node_load($_POST['nid']);
+//      dpm($sanPham);
+  $pathSanPham = 'https://hpmap.vn/'.drupal_get_path_alias('node/' . $sanPham->nid);
+  if ($sanPham->field_gia['und'][0]['value'][3] == '0') {
+    $giaSanPham = substr($sanPham->field_gia['und'][0]['value'], 0, -1);
+  } else {
+    $giaSanPham = $sanPham->field_gia['und'][0]['value'];
+  }
+  $title = $sanPham->title;
+  $body = $sanPham->body['und'][0]['value'];
+  $arrImages = '';
+  if (!empty($sanPham->field_anh_lien_quan)) {
+    foreach ($sanPham->field_anh_lien_quan['und'] as $index => $item) {
+      $path_style = image_style_url('1800_x_1150', $item['uri']);
+      $arrImages .= '<div class="item">' . theme_image_style([
+          'style_name' => '1800_x_1150',
+          'path' => $item['uri'],
+          'alt' => $sanPham->title,
+          'attributes' => array('class' => 'img-responsive img-fluid'),
+          'width' => '1800px',
+          'height' => '1150px',
+        ]) . '</div>';
+    }
+  } else {
+    $arrImages = theme_image_style([
+      'style_name' => '1800_x_1150',
+      'path' => $sanPham->field_image['und'][0]['uri'],
+      'alt' => $sanPham->title,
+      'attributes' => array('class' => 'img-responsive img-fluid'),
+      'width' => '1800px',
+      'height' => '1150px',
+    ]);
+  }
+  if (!empty($sanPham->field_anh_lien_quan)) {
+    foreach ($sanPham->field_anh_lien_quan['und'] as $index => $item) {
+      $path_style = image_style_url('1800_x_1150', $item['uri']);
+      $arrImages_desktop .= '<a href="#" title="' . $sanPham->title . '">' . theme_image_style([
+          'style_name' => '1800_x_1150',
+          'path' => $item['uri'],
+          'alt' => $sanPham->title,
+          'attributes' => array('class' => 'img-responsive img-fluid nav-image'),
+          'width' => '1800px',
+          'height' => '1150px',
+        ]) . '</a>';
+    }
+  } else {
+    $arrImages_desktop = '<a href="#" title="' . $sanPham->title . '"> ' . theme_image_style([
+        'style_name' => '1800_x_1150',
+        'path' => $sanPham->field_image['und'][0]['uri'],
+        'alt' => $sanPham->title,
+        'attributes' => array('class' => 'img-responsive img-fluid'),
+        'width' => '1800px',
+        'height' => '1150px',
+      ]) . '</a>';
+  }
+
+  $strSlider = <<<HTML
+                    <div class="owl-carousel">
+                          {$arrImages}
+                    </div>
+HTML;
+  $strimage = '
+    <div id="carouselExampleIndicators" class="carousel slide" data-ride="carousel">
+        <div class="carousel-inner">';
+  $i = 0;
+  if (!empty($sanPham->field_anh_lien_quan)) {
+    foreach ($sanPham->field_anh_lien_quan['und'] as $item) {
+      $image = theme_image_style([
+        'style_name' => '1800_x_1150',
+        'path' => $item['uri'],
+        'alt' => $sanPham->title,
+        'attributes' => array('class' => 'img-responsive img-fluid nav-image'),
+        'width' => '1800px',
+        'height' => '1150px',
+      ]);
+      if ($i == 0) {
+        $strimage .= '<div class="carousel-item active">';
+        $strimage .= $image;
+        $strimage .= '</div>';
+      } else {
+        $strimage .= '<div class="carousel-item">';
+        $strimage .= $image;
+        $strimage .= '</div>';
+      }
+      $i++;
+    };
+  } else {
+    $arrImages = theme_image_style([
+      'style_name' => '1800_x_1150',
+      'path' => $sanPham->field_image['und'][0]['uri'],
+      'alt' => $sanPham->title,
+      'attributes' => array('class' => 'img-responsive img-fluid'),
+      'width' => '1800px',
+      'height' => '1150px',
+    ]);
+    $strimage .= '<div class="carousel-item active">';
+    $strimage .= $arrImages;
+    $strimage .= '</div>';
+  }
+  $strimage .= '</div>';
+  $strimage .= '<ol class="carousel-indicators nav-image owl-carousel">';
+  $i = 0;
+
+  foreach ($sanPham->field_anh_lien_quan['und'] as $item) {
+    $image = theme_image_style([
+      'style_name' => '1800_x_1150',
+      'path' => $item['uri'],
+      'alt' => $sanPham->title,
+      'attributes' => array('class' => 'img-responsive img-fluid '),
+      'width' => '1800px',
+      'height' => '1150px',
+    ]);
+    if ($i == 0) {
+      $strimage .= '<li data-target="#carouselExampleIndicators" data-slide-to="' . $i . '" class="active item-image-nav">';
+      $strimage .= $image;
+      $strimage .= '</li>';
+    } else {
+      $strimage .= '<li data-target="#carouselExampleIndicators" data-slide-to="' . $i . '" class = "item-image-nav">';
+      $strimage .= $image;
+      $strimage .= '</li>';
+    }
+    $i++;
+  };
+  $strimage .= '</ol>';
+  $strimage .= '<a class="carousel-control-prev" href="#carouselExampleIndicators" role="button" data-slide="prev">
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            <span class="sr-only">Previous</span>
+        </a>';
+  $strimage .= '<a class="carousel-control-next" href="#carouselExampleIndicators" role="button" data-slide="next">
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            <span class="sr-only">Next</span>
+        </a>';
+  $strimage .= '</div>';
+  //    <div class="d-none d-sm-block">
+  //                        <div class="d-flex image-product-desktop popup-gallery flex-wrap">
+  //                           {$arrImages_desktop}
+  //                        </div>
+  //                    </div>
+
+  if (strpos($avatar, 'http') !== false)
+    $hinh_anh_ng_phu_trach = $avatar;
+  else
+    $hinh_anh_ng_phu_trach = '/sites/default/files/' . $avatar;
+  //dsm($member);
+
+  $nguoi_phu_trach = user_load($softSanPham['nguoi_phu_trach']['uid']);
+  if (isset($nguoi_phu_trach)) {
+    $hinh_anh_ng_phu_trach = file_create_url($nguoi_phu_trach->field_image['und'][0]['uri']);
+  }
+  $personInCharge = '<div class="person-in-charge">
+                            <div class="avatar">
+                                <img src="' . $hinh_anh_ng_phu_trach . '" class="img-fluid" alt="avatar" title="avatar">
+                                <a href="#" class="avatar-user" data-value="581">
+              <img src="/sites/default/files/logo_3.png" alt="Hpmap" class="img-fluid">
+            </a>
+                            </div>
+                            <div class="info">
+                            <span class="name">' . $softSanPham['nguoi_phu_trach']['ho_ten'] . '</span>
+                            <span> <a href="tel:' . $softSanPham['nguoi_phu_trach']['dien_thoai'] . '" class="phone " data-value="' . $sanPham->nid . '">' . $softSanPham['nguoi_phu_trach']['dien_thoai'] . '</a></span>
+                            </div>
+
+                       </div>';
+
+  if (!isset($sanPham->field_huong['und'][0]['value'])) {
+    $sanPham->field_huong['und'][0]['value'] = "";
+  }
+  if (!isset($sanPham->field_dien_tich_su_dung['und'][0]['value'])) {
+    $sanPham->field_dien_tich_su_dung['und'][0]['value'] = "";
+  }
+  if (!isset($sanPham->field_so_giuong['und'][0]['value'])) {
+    $sanPham->field_so_giuong['und'][0]['value'] = "";
+  }
+  if (!isset($sanPham->field_so_phong_tam['und'][0]['value'])) {
+    $sanPham->field_so_phong_tam['und'][0]['value'] = "";
+  }
+
+  if (!isset($softSanPham['vi_tri']['tinh_thanh'])) {
+    $softSanPham['vi_tri']['tinh_thanh'] = "";
+  }
+  if (!isset($softSanPham['vi_tri']['quan_huyen'])) {
+    $softSanPham['vi_tri']['quan_huyen'] = "";
+  }
+  if (!isset($softSanPham['vi_tri']['duong_pho'])) {
+    $softSanPham['vi_tri']['duong_pho'] = "";
+  }
+  if (!isset($softSanPham['vi_tri']['dia_chi_cu_the'])) {
+    $softSanPham['vi_tri']['dia_chi_cu_the'] = "";
+  }
+
+  if (!isset($dvt_new[$sanPham->field_don_vi_tinh['und'][0]['value']])) {
+    $dvt_new[$sanPham->field_don_vi_tinh['und'][0]['value']] = "";
+  }
+  $detailContent = '<div class="detail-content">
+                        <div class="summary mt-10">
+                            <h3 class="title">
+                                ' . $sanPham->title . '
+                            </h3>
+                            <div class="d-flex">
+                            <div class="fb-share-button"
+     data-href="'.$pathSanPham.'"
+     data-layout="button_count"
+     data-size="large">
+</div>
+  <div class="zalo-share-button" data-href="'.$pathSanPham.'" data-oaid="3542291725592077969" data-layout="2" data-color="blue" data-customize=true>
+    <img src="/sites/default/files/zalo-icon.png" alt="logo-zalo" class="btn-zalo"><span>Share</span>
+  </div>
+  <a href="#" class="btn-copy js-copy btn" data-href="'.$pathSanPham.'">Sao chép liên kết</a>
+</div>
+
+
+                            <div class="info-bottom">
+                                <span><i class="fa fa-qrcode" aria-hidden="true"></i> HP-' . $_POST['nid'] . '</span>
+                                <span><i class="far fa-calendar-alt"></i> ' . date('d/m/Y', $sanPham->field_ngay_dang['und'][0]['value']) . '</span>
+                                <span><i class="fas fa-eye"></i> ' . $softSanPham['san_pham']['luot_xem'] . ' lượt xem</span>
+                            </div>
+                            <div class="price-location">
+                                <span class="price"><i class="fas fa-money-bill-wave"></i> ' . $giaSanPham . " " . $dvt_new[$sanPham->field_don_vi_tinh['und'][0]['value']] . '</span>
+                                <span class="location-info"><i class="fas fa-map-marker-alt"></i> ' . $softSanPham['vi_tri']['dia_chi_cu_the'] . '</span>
+                            </div>
+                            <div class="info-summary">
+                                <span><i class="fa fa-expand"></i> ' . $sanPham->field_dien_tich_mat_bang['und'][0]['value'] . ' m<sup>2</sup></span>
+                                <span><i class="fa fa-bed"></i> ' . $sanPham->field_so_giuong['und'][0]['value'] . ' PN</span>
+                                <span><i class="fa fa-bath"></i> ' . $sanPham->field_so_phong_tam['und'][0]['value'] . ' VS</span>
+                                <span><i class="fab fa-safari"></i> ' . $sanPham->field_huong['und'][0]['value'] . '</span>
+                            </div>
+
+                        </div>
+                        <div class="detail-info">
+                           <div class="location-info ">
+                                <h3>Vị trí</h3>
+                                <div class="item-location"><strong>Tỉnh/Thành phố: </strong><span>' . $softSanPham['vi_tri']['tinh_thanh'] . '</span></div>
+                                <div class="item-location"><strong>Quận/Huyện: </strong><span>' . $softSanPham['vi_tri']['quan_huyen'] . '</span></div>
+                                <div class="item-location"><strong>Phường/Xã: </strong><span>' . $softSanPham['vi_tri']['duong_pho'] . '</span></div>
+                                <div class="item-location"><strong>Địa chỉ cụ thể: </strong><span>' . $softSanPham['vi_tri']['dia_chi_cu_the'] . '</span></div>
+                           </div>
+                           <div class="body-product mt-20">
+                               <h3>Mô tả chi tiết</h3>
+                               ' . $body . '
+                            </div>
+                        </div>
+                      </div>';
+  $content = <<<HTML
+        <div class="detail-product">
+          <div class="row">
+              <div class="col-md-6">
+                        {$strimage}
+              </div>
+              <div class="col-md-6">
+                <div class="content mt-mb-10">
+                    {$personInCharge}
+                    {$detailContent}
+                </div>
+              </div>
+          </div>
+        </div>
+HTML;
+
+  $arr = array(
+    'content' => $content,
+    'title' => $title
+  );
+  echo json_encode($arr);
+}
+
+function update_status_user()
+{
+  // if (!empty($_GET['uid'])) {
+  //   $user = user_load($_GET['uid']);
+  //   $user->status = 0;
+  //   $edit = array();
+  //   user_save($user, $edit);
+  // }
+  // $users = entity_load('user');
+
+  // foreach($users as $item){
+  //   // $item->field_xac_thuc_email['und'][0]['value'] = '1';
+  //   if($item->uid > 0 && $item->uid != 581 && $item->uid != 575 && $item->uid != 536&& $item->uid != 612){
+  //     $item->field_xac_thuc_email['und'][0]['value'] = '1';
+  //     $edit = array();
+  //     user_save($item,$edit);
+  //   }
+  // }
+}
+
+function update_xac_thuc_email_user()
+{
+
+  $reponse = '';
+  if (!empty($_POST['uid']) && !empty($_POST['status'])) {
+    $user = user_load($_POST['uid']);
+    $user->field_xac_thuc_email['und'][0]['value'] = $_POST['status'];
+    $is_save = user_save($user);
+    if ($is_save) {
+      $reponse = 'Lưu thành công';
+    } else {
+      $reponse = 'Lưu thất bại';
+    }
+  } else {
+    $reponse = "Không có dữ liệu.";
+  }
+  return drupal_json_output($reponse);
+}
+
+function uncheck_email_identity()
+{
+  $reponse = '';
+  if (!empty($_POST['uid'])) {
+  } else {
+    $reponse = "Không có dữ liệu.";
+  }
+  return drupal_json_output($reponse);
+}
+
+function update_status_product()
+{
+  $reponse = '';
+  global $user;
+  $token = md5(md5(date('YmdH') . $user->uid . 'MHS'));
+  if (isset($_POST['ids']) && isset($_POST['status'])) {
+    if (!is_array($_POST['ids']) || $_POST['status'] === '') {
+      $reponse = "Dữ liệu không hợp lệ.";
+    } else if (!in_array($_POST['status'], [
+      'Chờ duyệt', 'Đã duyệt', 'Không duyệt', 'Đang bán', 'Đã mất',
+      'Đã bán', 'Chờ bán', 'Xác nhận phụ trách',
+      'Không xác nhận phụ trách', 'Chờ xác nhận PT',
+      'Đã bán một phần'
+    ]))
+      $reponse = "Dữ liệu không hợp lệ.";
+    else {
+      $nodes = node_load_multiple($_POST['ids']);
+      foreach ($nodes as $node) {
+        // set status property to 1
+        $node->field_duyet_san_pham['und'][0]['value'] = $_POST['status'];
+        // re-save the node
+        node_save($node);
+      }
+    }
+  } else {
+    $reponse = "Không có dữ liệu sản phẩm.";
+  }
+  return drupal_json_output($reponse);
+}
+
+function delete_product()
+{
+  $reponse = '';
+  if (!empty($_POST['nid'])) {
+    if (!is_array($_POST['nid'])) {
+      $reponse = "Dữ liệu phải là mảng.";
+    } else {
+      foreach ($_POST['nid'] as $nid) {
+        node_delete($nid);
+      }
+      $reponse = "Dữ liệu đã được xoá thành công";
+    }
+  } else {
+    $reponse = "Không có dữ liệu nid.";
+  }
+  return drupal_json_output($reponse);
+}
+
+function get_products_follow_user($uid)
+{
+  $curl = curl_init();
+  global $user;
+  curl_setopt_array($curl, array(
+    CURLOPT_URL => "https://app.hpmap.vn/service/get-san-pham-dang-ban",
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_ENCODING => "",
+    CURLOPT_MAXREDIRS => 10,
+    CURLOPT_TIMEOUT => 30,
+    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+    CURLOPT_CUSTOMREQUEST => "POST",
+    CURLOPT_POSTFIELDS => json_encode([
+      'user_id' => $uid,
+    ]),
+    CURLOPT_HTTPHEADER => array(
+      "cache-control: no-cache",
+      "content-type: application/json",
+      "postman-token: 6069a2d7-1994-fa28-aa79-d44b6da55adf"
+    ),
+  ));
+
+  $response = curl_exec($curl);
+  $err = curl_error($curl);
+  curl_close($curl);
+  if ($err) {
+    return $err;
+  } else {
+    return json_decode($response, true);
+  }
+}
+
+function get_luot_xem($nid)
+{
+  global $user;
+  $curl = curl_init();
+  curl_setopt_array($curl, array(
+    CURLOPT_URL => 'https://app.hpmap.vn/service/add-luot-xem',
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_ENCODING => '',
+    CURLOPT_MAXREDIRS => 10,
+    CURLOPT_TIMEOUT => 0,
+    CURLOPT_FOLLOWLOCATION => true,
+    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+    CURLOPT_CUSTOMREQUEST => 'POST',
+    CURLOPT_POSTFIELDS => json_encode([
+      'nid' => $nid
+    ]),
+    // md5(md5($dateTime.$obj['ui'].$obj['title'].$obj['nid'].$obj['form_token'].'MHS'));
+    CURLOPT_HTTPHEADER => array(
+      'Content-Type: application/json'
+    ),
+  ));
+  $response = curl_exec($curl);
+  return $response;
+}
+
+function check_email_identity()
+{
+  $reponse = '';
+  if (!empty($_POST['uid'] && $_POST['uid'] != 0)) {
+    $user = user_load($_POST['uid']);
+    if ($user->field_xac_thuc_email['und'][0]['value'] == '0') {
+      $reponse = false;
+    } else {
+      $reponse = true;
+    }
+  } else {
+    $reponse = "Dữ liệu truyền vào chưa đúng";
+  }
+  return drupal_json_output([
+    'is_identity' => $reponse
+  ]);
+}
+
+function check_email_identity_login()
+{
+  try {
+    if ($_GET['uid'] && $_GET['email']) {
+      $user = user_load($_GET['uid']);
+      $user->mail = $_GET['email'];
+      $user->field_xac_thuc_email['und'][0]['value'] = '1';
+      $edit = array();
+      $is_save = user_save($user, $edit);
+      if ($is_save) {
+        $reponse = '<p>Xác thực email thành công <a href="/" class="text-primary">Quay lại trang chủ</a></p>';
+      } else {
+        $reponse = '<p>Xác thực email thất bại <a href="/" class="text-primary">Quay lại trang chủ</a></p>';
+      }
+    } else {
+      $reponse = 'Thiếu dữ liệu';
+    }
+    return html_entity_decode($reponse);
+  } catch (Exception $e) {
+    return "Exeption: ({$e->getCode()}): {$e->getMessage()}\n";
+  }
+}
+
+function update_user_password()
+{
+  require_once DRUPAL_ROOT . '/' . variable_get('password_inc', 'includes/password.inc');
+
+  $newhash = user_hash_password($_POST['new_pass']);
+//    db_query('update wtt_users set pass = '.$newhash.' where  uid = '.$_POST['uid'])->execute();
+  $updatepass = db_update('users')
+    ->fields(array('pass' => $newhash))
+    ->condition('uid', $_POST['uid'], '=')
+    ->execute();
+//    if ($updatepass) {
+  $reponse = 'Lưu thành công';
+//    } else {
+//        $reponse = 'Lưu thất bại';
+//    }
+  return json_encode($reponse);
+
+//  require_once DRUPAL_ROOT . '/includes/bootstrap.inc';
+//  drupal_bootstrap(DRUPAL_BOOTSTRAP_FULL);
+//  require_once DRUPAL_ROOT . '/includes/password.inc';
+//
+//    if ($_POST['uid'] && $_POST['current_pass'] && $_POST['new_pass']) {
+//        $account = user_load($_POST['uid']);
+//        if (user_check_password($_POST['current_pass'], $account)) {
+//
+//        } else {
+//            $reponse = 'password chưa chính xác';
+//        }
+//    } else {
+//        $reponse = 'Thiếu dữ liệu';
+//    }
+//    return drupal_json_output($reponse);
+//
+//
+//  try {
+//  } catch (Exception $e) {
+//    return "Exeption: ({$e->getCode()}): {$e->getMessage()}\n";
+//  }
+}
+
+function update_user_email()
+{
+  try {
+    if ($_POST['uid'] && $_POST['email']) {
+      $user = user_load($_POST['uid']);
+      $user->mail = $_POST['email'];
+      $edit = array();
+      $is_save = user_save($user, $edit);
+      if ($is_save) {
+        $reponse = 'Lưu thành công';
+      } else {
+        $reponse = 'Lưu thất bại';
+      }
+    } else {
+      $reponse = 'Thiếu dữ liệu';
+    }
+    return drupal_json_output($reponse);
+  } catch (Exception $e) {
+    return "Exeption: ({$e->getCode()}): {$e->getMessage()}\n";
+  }
+}
+
+function convert_url()
+{
+  try {
+    if ($_POST['nid']) {
+      $reponse = drupal_get_path_alias('node/' . $_POST['nid']);
+    } else {
+      $reponse = 'Thiếu dữ liệu';
+    }
+    return drupal_json_output($reponse);
+  } catch (Exception $e) {
+    return "Exeption: ({$e->getCode()}): {$e->getMessage()}\n";
+  }
+}
+
+function hpmap_permission()
+{
+  return array(
+    'tim-san-pham' => array(
+      'title' => 'Tìm kiếm sản phẩm',
+    ),
+
+  );
+}

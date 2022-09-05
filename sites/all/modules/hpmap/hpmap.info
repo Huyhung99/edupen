@@ -1,0 +1,6 @@
+name = Bluesky
+description = Nhận báo giá và tra cứu
+core = 7.x
+files[] = hpmap.module
+package = "MH-Solutions"
+php = 5.2

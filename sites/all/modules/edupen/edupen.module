@@ -1,0 +1,349 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function edupen_menu()
+{
+  $items['luu-bai-lam'] = array(
+    'title' => 'Lưu bài làm',
+    'delivery callback' => 'save_assignment',
+    'access callback' => 'TRUE',
+    'type' => MENU_CALLBACK
+  );
+  $items['cap-nhat-bai-lam'] = array(
+    'title' => 'Cập nhật bài làm',
+    'delivery callback' => 'update_assignment',
+    'access callback' => 'TRUE',
+    'type' => MENU_CALLBACK
+  );
+  $items['kiem-tra-bai-lam-chua-hoan-thanh'] = array(
+    'title' => 'Kiểm tra bài làm đã hoàn thành',
+    'delivery callback' => 'check_completed_assignment',
+    'access callback' => 'TRUE',
+    'type' => MENU_CALLBACK
+  );
+  $items['cap-nhat-trang-thai-thi'] = array(
+    'title' => 'Cập nhật trạng thái thi',
+    'delivery callback' => 'update_exam_status',
+    'access callback' => 'TRUE',
+    'type' => MENU_CALLBACK
+  );
+  $items['them-yeu-cau-nang-cap-tk'] = array(
+    'title' => 'Yêu cầu nâng cấp tài khoản',
+    'delivery callback' => 'them_yeu_cau_nang_cap_tk',
+    'access callback' => 'TRUE',
+    'type' => MENU_CALLBACK
+  );
+  $items['duyet-nang-cap-tai-khoan'] = array(
+    'title' => 'Duyệt nâng cấp tài khoản',
+    'delivery callback' => 'duyet_nang_cap_tai_khoan',
+    'access callback' => 'TRUE',
+    'type' => MENU_CALLBACK
+  );
+
+  return $items;
+}
+function save_assignment(){
+  $response = '';
+  if($_POST['data']){
+    $exam = node_load($_POST['data']['exam_id']);
+    $newNode = new stdClass();
+    $newNode->type = 'bai_lam';
+    $newNode->title = "Bài làm ".$exam->title.date("d/m/Y");
+    $newNode->uid = $_POST['data']['uid'];
+    $newNode->created = strtotime("now");
+    $newNode->changed = strtotime("now");
+    $newNode->status = 1;
+    $newNode->language = 'vi';
+    $newNode->comment = 0;
+    $newNode->promote = 0;
+    $newNode->moderate = 0;
+    $newNode->sticky = 0;
+    $newNode->field_cau_tra_loi['und'][0]['value'] = $_POST['data']['assignment'];
+    $newNode->field_user['und'][0]['target_id'] = $_POST['data']['uid'];
+    $newNode->field_de_thi['und'][0]['target_id'] = $_POST['data']['exam_id'];
+    $answers = count(json_decode($_POST['data']['assignment'])->data);
+    if ($answers == $_POST['data']['questions']){
+      $newNode->field_trang_thai_thi['und'][0]['value'] = 1;
+    }else{
+      $newNode->field_trang_thai_thi['und'][0]['value'] = 0;
+    }
+    $newNode = node_submit($newNode);
+    try {
+      node_save($newNode);
+      $node_id = $newNode->nid;
+      $success = TRUE;
+      $response = $node_id;
+    }
+    catch (Exception $e) {
+      // Do your error handling here.
+      $response = "lưu thất bại".$e->getMessage();
+    }
+  }
+  drupal_json_output([
+    'response' => $response
+  ]);
+}
+function update_assignment(){
+  $response = '';
+  if($_POST['data']){
+    $node = node_load($_POST['data']['eid']);
+    $node->field_cau_tra_loi['und'][0]['value'] = $_POST['data']['assignment'];
+    $node->field_thoi_gian_con_lai['und'][0]['value'] = $_POST['data']['leaveTime'];
+    $answers = count(json_decode($_POST['data']['assignment'])->data);
+    if ($answers == $_POST['data']['questions']){
+      $node->field_trang_thai_thi['und'][0]['value'] = 1;
+    }else{
+      $node->field_trang_thai_thi['und'][0]['value'] = 0;
+    }
+    try {
+      node_save($node);
+      $success = TRUE;
+      $response = "Cập nhật thành công";
+    }
+    catch (Exception $e) {
+      // Do your error handling here.
+      $response = "lưu thất bại".$e->getMessage();
+    }
+  }
+  drupal_json_output([
+    'response' => $response,
+    'data' => $_POST
+  ]);
+}
+function check_completed_assignment(){
+  $response = '';
+  if ($_POST['uid']){
+    $exams = node_load_multiple(array(),array(
+      'type' => 'bai_lam',
+      'uid' => $_POST['uid']
+    ));
+    foreach ($exams as $exam){
+      if ($exam->field_trang_thai_thi['und'][0]['value'] == 0){
+        $response = [
+          'notify' => 0,
+          'path' => '/'.drupal_get_path_alias('node/'.$exam->field_de_thi['und'][0]['target_id']),
+          'answer' => $exam->field_cau_tra_loi['und'][0]['value'],
+          'eid' => $exam->nid
+        ];
+      }
+    }
+  }
+  drupal_json_output([
+    'data' => $response
+  ]);
+}
+function update_exam_status(){
+  $response = '';
+  if ($_POST['uid']){
+
+    $exams = node_load_multiple(array(),array(
+      'type' => 'bai_lam',
+      'uid' => $_POST['uid']
+    ));
+    foreach ($exams as $exam){
+      if ($exam->field_trang_thai_thi['und'][0]['value'] == 0){
+
+        $data = [
+          'notify' => 0,
+          'path' => '/'.drupal_get_path_alias('node/'.$exam->field_de_thi['und'][0]['target_id']),
+          'answer' => $exam->field_cau_tra_loi['und'][0]['value'],
+          'eid' => $exam->nid,
+          'leaveTime' => $exam->field_thoi_gian_con_lai['und'][0]['value']
+        ];
+        $completed_exam = $exam;
+      }
+    }
+    $completed_exam->field_trang_thai_thi['und'][0]['value'] = 1;
+    try {
+      node_save($completed_exam);
+      $success = TRUE;
+      $response = "Cập nhật thành công";
+    }
+    catch (Exception $e) {
+      // Do your error handling here.
+      $response = "lưu thất bại".$e->getMessage();
+    }
+  }
+  drupal_json_output([
+    'data' => [
+      'response' => $response,
+      'exam' => $data
+    ]
+  ]);
+}
+
+/**
+ * Implements hook_form_BASE_FORM_ID_alter().
+ */
+function edupen_form_user_login_alter(&$form, &$form_state, $form_id)
+{
+  $form['name']['#attributes']['class'] = array('form-control d-none');
+  $form['pass']['#attributes']['class'] = array('form-control d-none');
+  $form['pass']['#title_display'] = 'invisible';
+  $form['name']['#title_display'] = 'invisible';
+  $form['actions']['submit']['#attributes']['class'] = array('btn btn-primary btn-hover-secondary w-100 fw-bold d-none');
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function edupen_form_user_register_form_alter(&$form, &$form_state, $form_id)
+{
+  $form['#validate'][] = 'user_register_form_validate';
+//  $form['actions']['submit']['#value'] = t('Cập nhật thông tin');
+
+
+}
+function user_register_form_validate($form,$form_state){
+  $so_dau = [3,4,5,7,8,9];
+  $so_thu_hai = [0,1,2,3,4,5,6,7,8,9];
+  if (strlen($form_state['values']['field_so_dien_thoai']['und'][0]['value']) <= 0
+    && strlen($form_state['values']['field_so_dien_thoai']['und'][0]['value']) == 10){
+    form_set_error('title', t('Chưa đúng định dạng số điện thoại.'));
+  };
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function edupen_form_webform_client_form_80_alter(&$form, &$form_state, $form_id)
+{
+  $form['submitted']['de_thi']['#default_value'] = arg(1);
+  $form['actions']['submit']['#attributes']['class'] = array('btn btn-primary btn-hover-secondary');
+  $form['submitted']['de_thi']['#attributes']['class'] = array('d-none');
+}
+function them_yeu_cau_nang_cap_tk(){
+  $response = '';
+  if ($_POST['uid']){
+    $nguoi_yeu_cau = user_load($_POST['uid']);
+    $query = new EntityFieldQuery();
+    $query->entityCondition('entity_type', 'node')
+      ->entityCondition('bundle', 'yeu_cau_nang_cap_tk')
+      ->fieldCondition('field_nguoi_yeu_cau','target_id',$_POST['uid'],'=')
+      // Run the query as user 1.
+      ->addMetaData('account', user_load(1));
+
+    $result = $query->execute();
+    if (isset($result['node'])) {
+      $news_items_nids = array_keys($result['node']);
+      $news_items = entity_load('node', $news_items_nids);
+    }
+    if (empty($news_items)) {
+      $newNode = new stdClass();
+      $newNode->type = 'yeu_cau_nang_cap_tk';
+      $newNode->title = "Yêu cầu nâng cấp tài khoản " . $nguoi_yeu_cau->name . ' ' . date("d/m/Y");
+      $newNode->uid = $_POST['uid'];
+      $newNode->created = strtotime("now");
+      $newNode->changed = strtotime("now");
+      $newNode->status = 1;
+      $newNode->language = 'vi';
+      $newNode->comment = 0;
+      $newNode->promote = 0;
+      $newNode->moderate = 0;
+      $newNode->sticky = 0;
+      $newNode->field_nguoi_yeu_cau['und'][0]['target_id'] = $_POST['uid'];
+      $newNode->field_trang_thai['und'][0]['value'] = 'Chờ duyệt';
+      $newNode = node_submit($newNode);
+      node_save($newNode);
+    }
+
+    $newNode_history = new stdClass();
+    $newNode_history->type = 'lich_su_yeu_cau_nang_cap';
+    $newNode_history->title = "Yêu cầu nâng cấp tài khoản ".$nguoi_yeu_cau->name.' '.date("d/m/Y");
+    $newNode_history->uid = $_POST['uid'];
+    $newNode_history->created = strtotime("now");
+    $newNode_history->changed = strtotime("now");
+    $newNode_history->status = 1;
+    $newNode_history->language = 'vi';
+    $newNode_history->comment = 0;
+    $newNode_history->promote = 0;
+    $newNode_history->moderate = 0;
+    $newNode_history->sticky = 0;
+    $newNode_history->field_trang_thai['und'][0]['value'] = 'Chờ duyệt';
+    $newNode_history->field_nguoi_yeu_cau['und'][0]['target_id'] = $_POST['uid'];
+    $newNode_history = node_submit($newNode_history);
+
+  }
+  drupal_json_output([
+    'response' => $response,
+  ]);
+}
+function duyet_nang_cap_tai_khoan(){
+  global $user;
+  $response = '';
+  if ($_POST['nid']){
+    $nguoi_yeu_cau = user_load($_POST['uid']);
+    if ($_POST['uid'] && $_POST['status'] == 'Đã duyệt'){
+      $role = user_role_load_by_name('Giáo viên');
+      user_multiple_role_edit(array($nguoi_yeu_cau->uid),'add_role',$role->rid);
+    }
+
+    $newNode_history = new stdClass();
+    $newNode_history->type = 'lich_su_yeu_cau_nang_cap';
+    $newNode_history->title = "Yêu cầu nâng cấp tài khoản ".$nguoi_yeu_cau->name.' '.date("d/m/Y");
+    $newNode_history->uid = $_POST['uid'];
+    $newNode_history->created = strtotime("now");
+    $newNode_history->changed = strtotime("now");
+    $newNode_history->status = 1;
+    $newNode_history->language = 'vi';
+    $newNode_history->comment = 0;
+    $newNode_history->promote = 0;
+    $newNode_history->moderate = 0;
+    $newNode_history->sticky = 0;
+    $newNode_history->field_trang_thai['und'][0]['value'] = $_POST['status'];
+    $newNode_history->field_nguoi_yeu_cau['und'][0]['target_id'] = $_POST['uid'];
+    $newNode_history = node_submit($newNode_history);
+
+    $node = node_load($_POST['nid']);
+    $node->field_trang_thai['und'][0]['value'] = $_POST['status'];
+    $node->field_nguoi_duyet['und'][0]['target_id'] = $user->uid;
+
+    try {
+      node_save($newNode_history);
+      field_attach_update('node', $node);
+      $success = TRUE;
+      $response = 'Lưu thành công';
+    }
+    catch (Exception $e) {
+      // Do your error handling here.
+      $response = "lưu thất bại".$e->getMessage();
+    }
+  }
+  drupal_json_output([
+    'response'=> $response
+  ]);
+}
+
+/**
+ * Implements hook_user_insert().
+ */
+function edupen_user_insert(&$edit, $account, $category)
+{
+  $wallet = new stdClass();
+  $wallet->type = 'vi_tien';
+  $wallet->title = "Ví tiền ".$account->name;
+  $wallet->uid = $account->uid;
+  $wallet->created = strtotime("now");
+  $wallet->changed = strtotime("now");
+  $wallet->status = 1;
+  $wallet->language = 'vi';
+  $wallet->comment = 0;
+  $wallet->promote = 0;
+  $wallet->moderate = 0;
+  $wallet->sticky = 0;
+  $wallet->field_user['und'][0]['target_id'] = $account->uid;
+  $wallet->field_so_du['und'][0]['value'] = 0;
+  $wallet = node_submit($wallet);
+  node_save($wallet);
+}
+function edupen_permission()
+{
+  return array(
+    'luu_bai-lam' => array(
+      'title' => 'Lưu bài làm',
+    ),
+  );
+}
+

@@ -1,0 +1,6 @@
+name = EDUPEN
+description = Module quản lý đề thi
+core = 7.x
+files[] = a_quan_ly_de_thi.module
+package = "ANDIN JSC"
+php = 5.2

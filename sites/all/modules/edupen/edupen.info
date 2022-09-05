@@ -1,0 +1,6 @@
+name = edupen
+description = Quản lý bài làm
+core = 7.x
+files[] = edupen.module
+package = "ANDIN JSC"
+php = 5.2
